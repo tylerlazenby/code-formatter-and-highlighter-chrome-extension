@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Formatter & Highlighter</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Highlight.js for Syntax Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- SQL Formatter -->
+    <script src="https://unpkg.com/sql-formatter@15.3.2/dist/sql-formatter.min.js"></script>
+
+    <style>
+        body {
+            /* Chrome extension popups have a max width of 800px and max height of 600px */
+            width: 700px;
+            height: 550px;
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d1117; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #30363d; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8b949e; 
+        }
+
+        .hljs {
+            background: transparent !important;
+            padding: 0 !important;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-full font-sans antialiased overflow-hidden">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-700 shadow-sm shrink-0">
+        <div class="flex items-center gap-2">
+            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+            <h1 class="text-lg font-semibold text-white">Smart Code Formatter</h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <select id="langSelect" class="bg-gray-800 text-sm border border-gray-700 text-gray-300 rounded-md py-1.5 px-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                <option value="auto">Auto-Detect</option>
+                <option value="sql">SQL</option>
+                <option value="json">JSON</option>
+                <option value="javascript">JavaScript</option>
+            </select>
+            <button id="formatBtn" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium py-1.5 px-4 rounded-md transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-900">
+                Format Code
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col p-4 gap-4 overflow-hidden bg-[#0d1117]">
+        
+        <!-- Input Section -->
+        <div class="flex-1 flex flex-col min-h-[120px]">
+            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Input / Paste Raw Text</label>
+            <textarea id="inputStr" class="flex-1 w-full bg-gray-900 text-gray-300 border border-gray-700 rounded-lg p-3 font-mono text-sm resize-none focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-inner placeholder-gray-600" placeholder='Paste your raw code, SQL, or JSON here...&#10;e.g., {"sql": "CREATE TABLE..."}'></textarea>
+        </div>
+
+        <!-- Output Section -->
+        <div class="flex-1 flex flex-col min-h-[150px] relative group">
+            <div class="flex justify-between items-center mb-2">
+                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Formatted Output</label>
+                <button id="copyBtn" class="text-xs flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-1 px-2 rounded transition-colors border border-gray-700 hidden">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    Copy
+                </button>
+            </div>
+            <div class="flex-1 bg-gray-900 border border-gray-700 rounded-lg overflow-auto shadow-inner">
+                <pre class="m-0 p-4 min-h-full"><code id="outputBlock" class="font-mono text-sm text-gray-300 break-words whitespace-pre-wrap">Waiting for input...</code></pre>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('inputStr');
+            const output = document.getElementById('outputBlock');
+            const langSelect = document.getElementById('langSelect');
+            const formatBtn = document.getElementById('formatBtn');
+            const copyBtn = document.getElementById('copyBtn');
+
+            // Format Logic
+            formatBtn.addEventListener('click', () => {
+                const val = input.value.trim();
+                if (!val) {
+                    output.textContent = "Please paste some code to format.";
+                    output.className = "text-gray-500 font-mono text-sm";
+                    copyBtn.classList.add('hidden');
+                    return;
+                }
+
+                const lang = langSelect.value;
+                let formatted = val;
+                let detectedLang = lang;
+
+                if (lang === 'auto') {
+                    // Try to parse as JSON first (Smart Nested Parsing)
+                    let isJson = false;
+                    let parsedJson = null;
+                    try { 
+                        parsedJson = JSON.parse(val); 
+                        isJson = typeof parsedJson === 'object' && parsedJson !== null;
+                    } catch(e) {}
+
+                    if (isJson) {
+                        let sqlMap = {};
+                        let tokenCounter = 0;
+
+                        // Recursive function to search for SQL embedded in JSON strings
+                        function traverseAndFormat(obj) {
+                            for (let k in obj) {
+                                if (typeof obj[k] === 'string') {
+                                    // Detect common SQL start keywords
+                                    if (/^\s*(CREATE|SELECT|INSERT|UPDATE|DELETE|WITH|ALTER|DROP)\b/i.test(obj[k])) {
+                                        let formattedSql = obj[k];
+                                        try {
+                                            // Format the SQL
+                                            formattedSql = sqlFormatter.format(obj[k]);
+                                        } catch(e) {}
+                                        
+                                        // Replace with a temporary token to prevent escaping issues
+                                        let token = `___SQL_TOKEN_${tokenCounter++}___`;
+                                        sqlMap[token] = formattedSql;
+                                        obj[k] = token; 
+                                    }
+                                } else if (typeof obj[k] === 'object' && obj[k] !== null) {
+                                    traverseAndFormat(obj[k]);
+                                }
+                            }
+                        }
+
+                        traverseAndFormat(parsedJson);
+                        formatted = JSON.stringify(parsedJson, null, 2);
+
+                        // Replace tokens with beautifully formatted SQL inside backticks
+                        for (let token in sqlMap) {
+                            // Using JS backticks for readable multi-line strings in JSON structures
+                            formatted = formatted.replace(`"${token}"`, '`\n' + sqlMap[token] + '\n  `');
+                        }
+                        
+                        // We format the final output as javascript so the backtick syntax highlights correctly
+                        detectedLang = 'javascript'; 
+                    } else {
+                        // Not JSON. Check if it looks like raw SQL
+                        if (/^\s*(CREATE|SELECT|INSERT|UPDATE|DELETE|WITH|ALTER|DROP)\b/i.test(val)) {
+                            try {
+                                formatted = sqlFormatter.format(val);
+                                detectedLang = 'sql';
+                            } catch(e) {
+                                detectedLang = 'plaintext';
+                            }
+                        } else {
+                            detectedLang = 'plaintext';
+                        }
+                    }
+                } else if (lang === 'sql') {
+                    try { formatted = sqlFormatter.format(val); detectedLang = 'sql'; } catch(e) {}
+                } else if (lang === 'json') {
+                    try { formatted = JSON.stringify(JSON.parse(val), null, 2); detectedLang = 'json'; } catch(e) {}
+                } else if (lang === 'javascript') {
+                    detectedLang = 'javascript';
+                }
+
+                // Apply Output & Highlighting
+                output.className = 'font-mono text-sm break-words whitespace-pre-wrap'; // Reset classes
+                if (detectedLang !== 'plaintext' && detectedLang !== 'auto') {
+                    output.classList.add(`language-${detectedLang}`);
+                }
+                
+                output.textContent = formatted;
+                
+                // Trigger Highlight.js
+                delete output.dataset.highlighted; 
+                hljs.highlightElement(output);
+
+                // Show copy button
+                copyBtn.classList.remove('hidden');
+            });
+
+            // Copy to Clipboard Logic
+            copyBtn.addEventListener('click', () => {
+                const textToCopy = output.textContent;
+                
+                // Extension approach
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const originalText = copyBtn.innerHTML;
+                    copyBtn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Copied!`;
+                    copyBtn.classList.add('text-green-400', 'border-green-400');
+                    
+                    setTimeout(() => {
+                        copyBtn.innerHTML = originalText;
+                        copyBtn.classList.remove('text-green-400', 'border-green-400');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Could not copy text: ', err);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
