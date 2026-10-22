@@ -1,0 +1,14 @@
+{
+"manifest_version": 3,
+"name": "Code Formatter & Highlighter",
+"version": "1.0",
+"description": "Auto-formats and syntax highlights pasted code (JSON with embedded SQL, Raw SQL, etc).",
+"action": {
+"default_popup": "popup.html",
+"default_title": "Format Code"
+},
+"permissions": [
+"clipboardWrite",
+"clipboardRead"
+]
+}
