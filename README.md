@@ -31,3 +31,5 @@ To publish to the Chrome Web Store, compress the project files (`manifest.json`,
 
 ## License
 MIT
+
+*Note: See [AI_DISCLOSURE.md](AI_DISCLOSURE.md) for details on AI assistance in this project.*
